@@ -5,6 +5,8 @@ from werkzeug.utils import secure_filename
 from database import db
 from models.document import Document
 from services.ocr_service import extract_text
+from services.validate_document import validate_document
+
 
 verify_bp = Blueprint('verify', __name__)
 
