@@ -45,7 +45,8 @@ def upload_document():
         if extracted_text.startswith("ERROR:"):
             status = "Rejected"
         else:
-            status = "Verified" if len(extracted_text.strip()) > 20 else "Rejected"
+            status = "Verified" if validate_document(extracted_text, doc_type) else "Rejected"
+
 
         print(f"[STEP 5] Status: {status}")
         print("[STEP 6] Saving to database...")
