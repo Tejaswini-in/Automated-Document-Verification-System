@@ -1,0 +1,11 @@
+
+### 📄 `requirements.txt`
+
+
+flask
+flask-cors
+flask-sqlalchemy
+pytesseract
+Pillow
+python-dotenv
+
