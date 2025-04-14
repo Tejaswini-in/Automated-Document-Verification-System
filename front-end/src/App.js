@@ -5,7 +5,14 @@ import Login from "./pages/Login";
 import Register from "./pages/Register";
 import AdminDashboard from "./pages/AdminDashboard";
 import UserDashboard from "./pages/UserDashboard";
+import Upload from "./pages/Upload"; // Import Upload
 import Navbar from "./components/Navbar";
+
+// Admin Pages
+import ManageUsers from "./pages/admin/ManageUsers";
+import ViewDocuments from "./pages/admin/ViewDocuments";
+import ForgeryReports from "./pages/admin/ForgeryReports";
+import AuditLogs from "./pages/admin/AuditLogs";
 
 function App() {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
@@ -34,6 +41,7 @@ function App() {
           <Route path="/login" element={<Login onLogin={handleLogin} />} />
           <Route path="/register" element={<Register />} />
 
+          {/* Protected Admin Routes */}
           <Route
             path="/admin/dashboard"
             element={
@@ -45,10 +53,62 @@ function App() {
             }
           />
           <Route
+            path="/admin/manage-users"
+            element={
+              isAuthenticated && isAdmin ? (
+                <ManageUsers />
+              ) : (
+                <Login onLogin={handleLogin} />
+              )
+            }
+          />
+          <Route
+            path="/admin/view-documents"
+            element={
+              isAuthenticated && isAdmin ? (
+                <ViewDocuments />
+              ) : (
+                <Login onLogin={handleLogin} />
+              )
+            }
+          />
+          <Route
+            path="/admin/forgery-reports"
+            element={
+              isAuthenticated && isAdmin ? (
+                <ForgeryReports />
+              ) : (
+                <Login onLogin={handleLogin} />
+              )
+            }
+          />
+          <Route
+            path="/admin/audit-logs"
+            element={
+              isAuthenticated && isAdmin ? (
+                <AuditLogs />
+              ) : (
+                <Login onLogin={handleLogin} />
+              )
+            }
+          />
+
+          {/* Protected User Routes */}
+          <Route
             path="/user/dashboard"
             element={
               isAuthenticated && !isAdmin ? (
                 <UserDashboard />
+              ) : (
+                <Login onLogin={handleLogin} />
+              )
+            }
+          />
+          <Route
+            path="/user/upload"
+            element={
+              isAuthenticated && !isAdmin ? (
+                <Upload />
               ) : (
                 <Login onLogin={handleLogin} />
               )

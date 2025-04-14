@@ -1,0 +1,63 @@
+[
+    {
+      "id": 1,
+      "action": "Dashboard Access",
+      "user": "admin123",
+      "timestamp": "2025-04-14T10:25:30Z"
+    },
+    {
+      "id": 2,
+      "action": "Manage Users Access",
+      "user": "admin123",
+      "timestamp": "2025-04-14T10:30:15Z"
+    },
+    {
+      "id": 3,
+      "action": "View Documents Access",
+      "user": "admin123",
+      "timestamp": "2025-04-14T10:35:00Z"
+    },
+    {
+      "id": 4,
+      "action": "Forgery Reports Access",
+      "user": "admin123",
+      "timestamp": "2025-04-14T10:40:45Z"
+    },
+    {
+      "id": 5,
+      "action": "Audit Logs Access",
+      "user": "admin123",
+      "timestamp": "2025-04-14T10:45:00Z"
+    },
+    {
+      "id": 6,
+      "action": "User Added",
+      "user": "admin123",
+      "timestamp": "2025-04-14T11:00:30Z"
+    },
+    {
+      "id": 7,
+      "action": "User Deleted",
+      "user": "admin123",
+      "timestamp": "2025-04-14T11:05:30Z"
+    },
+    {
+      "id": 8,
+      "action": "Document Uploaded",
+      "user": "john_doe",
+      "timestamp": "2025-04-14T11:10:30Z"
+    },
+    {
+      "id": 9,
+      "action": "Document Verified",
+      "user": "admin123",
+      "timestamp": "2025-04-14T11:15:00Z"
+    },
+    {
+      "id": 10,
+      "action": "Forgery Report Generated",
+      "user": "admin123",
+      "timestamp": "2025-04-14T11:20:00Z"
+    }
+  ]
+  

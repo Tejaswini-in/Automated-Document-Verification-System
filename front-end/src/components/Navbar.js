@@ -27,13 +27,20 @@ const Navbar = ({ isAuthenticated, isAdmin, onLogout }) => {
           {isAuthenticated ? (
             <>
               {isAdmin ? (
-                <li className="nav-item">
-                  <Link className="nav-link" to="/admin/dashboard">Admin Dashboard</Link>
-                </li>
+                <>
+                  <li className="nav-item">
+                    <Link className="nav-link" to="/admin/dashboard">Admin Dashboard</Link>
+                  </li>
+                </>
               ) : (
-                <li className="nav-item">
-                  <Link className="nav-link" to="/user/dashboard">User Dashboard</Link>
-                </li>
+                <>
+                  <li className="nav-item">
+                    <Link className="nav-link" to="/user/dashboard">User Dashboard</Link>
+                  </li>
+                  <li className="nav-item">
+                    <Link className="nav-link" to="/user/upload">Upload</Link>
+                  </li>
+                </>
               )}
             </>
           ) : (

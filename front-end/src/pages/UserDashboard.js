@@ -26,7 +26,7 @@ const UserDashboard = () => {
 
     try {
       setLoading(true);
-      const response = await axios.post("http://localhost:5000/verify/upload", formData, {
+      const response = await axios.post("http://localhost:3000/verify/upload", formData, {
         headers: {
           "Content-Type": "multipart/form-data"
         }
