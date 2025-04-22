@@ -22,17 +22,15 @@ const UserDashboard = () => {
 
     const formData = new FormData();
     formData.append("file", file);
-    formData.append("doc_type", docType);  // Make sure this matches Flask form field
+    formData.append("doc_type", docType); // Flask backend must handle "doc_type"
 
     try {
       setLoading(true);
       const response = await axios.post("http://localhost:5000/verify/upload", formData, {
         headers: {
-          "Content-Type": "multipart/form-data"
-        }
+          "Content-Type": "multipart/form-data",
+        },
       });
-
-      
 
       const { status, extracted } = response.data;
 
@@ -78,9 +76,11 @@ const UserDashboard = () => {
             value={docType}
             onChange={(e) => setDocType(e.target.value)}
           >
-            <option value="aadhaar">Aadhaar</option>
-            <option value="pan">PAN</option>
-            <option value="govt">Government ID</option>
+            <option value="aadhaar">Aadhaar Card</option>
+            <option value="pan">PAN Card</option>
+            <option value="driving_license">Driving License</option>
+            <option value="voter_id">Voter ID</option>
+            <option value="passport">Passport</option>
           </select>
         </div>
 
