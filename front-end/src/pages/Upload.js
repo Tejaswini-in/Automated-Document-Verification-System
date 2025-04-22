@@ -9,6 +9,8 @@ export default function Upload() {
           <select className="form-select">
             <option>Aadhaar</option>
             <option>PAN</option>
+            <option>Voter ID</option>
+            <option>Driving License</option>
             <option>Passport</option>
           </select>
         </div>
