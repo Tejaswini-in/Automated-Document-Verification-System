@@ -1,6 +1,5 @@
 import json
 import os
-
 from flask import Blueprint, jsonify, request
 from models.user import User
 from models.document import Document
@@ -23,12 +22,13 @@ def get_all_users():
     query = User.query.paginate(page=page, per_page=limit, error_out=False)
     users = query.items
 
-    log_action(user_id=1, action="Manage Users Access")  # Replace with real admin ID
+    log_action(user_id=1, action="Accessed Manage Users")
+
     return jsonify({
         "users": [
             {
                 "id": u.id,
-                "name": u.name,
+                "username": u.name,
                 "email": u.email,
                 "role": u.role
             } for u in users
@@ -63,7 +63,8 @@ def get_all_documents():
     paginated = query.paginate(page=page, per_page=limit, error_out=False)
     docs = paginated.items
 
-    log_action(user_id=1, action="View Documents Access")
+    log_action(user_id=1, action="Accessed View Documents")
+
     return jsonify({
         "documents": [
             {
@@ -95,7 +96,7 @@ def delete_document(doc_id):
 @admin_bp.route('/reports', methods=['GET'])
 def get_reports():
     reports = Document.query.filter(Document.result_data != None).all()
-    log_action(user_id=1, action="Forgery Reports Access")
+    log_action(user_id=1, action="Accessed Forgery Reports")
     return jsonify([
         {
             "id": r.id,
@@ -110,7 +111,7 @@ def get_reports():
 @admin_bp.route('/audit-logs', methods=['GET'])
 def get_audit_logs():
     logs = AuditLog.query.order_by(AuditLog.timestamp.desc()).all()
-    log_action(user_id=1, action="Audit Logs Access")
+    log_action(user_id=1, action="Accessed Audit Logs")
     return jsonify([
         {
             "id": log.id,
