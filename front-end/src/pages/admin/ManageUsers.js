@@ -1,29 +1,34 @@
-import React, { useEffect, useState } from 'react';
-import axios from 'axios';
+import React, { useEffect, useState } from "react";
+import axios from "axios";
 
 const ManageUsers = () => {
   const [users, setUsers] = useState([]);
-  const [loading, setLoading] = useState(true);
 
   const fetchUsers = async () => {
     try {
-      const response = await axios.get('/api/users'); // Update with your actual API route
-      setUsers(response.data);
-    } catch (error) {
-      console.error('Error fetching users:', error);
-    } finally {
-      setLoading(false);
+      const res = await axios.get("/api/admin/users", { withCredentials: true });
+      setUsers(res.data.users);
+    } catch (err) {
+      console.error("Error fetching users:", err);
     }
   };
 
-  const handleDelete = async (userId) => {
-    if (!window.confirm("Are you sure you want to delete this user?")) return;
-
+  const handleToggleSuspend = async (id) => {
     try {
-      await axios.delete(`/api/users/${userId}`);
-      setUsers(users.filter(user => user.id !== userId));
-    } catch (error) {
-      console.error('Error deleting user:', error);
+      await axios.post(`/api/admin/users/${id}/suspend-toggle`, {}, { withCredentials: true });
+      fetchUsers(); // Refresh list
+    } catch (err) {
+      console.error("Error toggling suspend:", err);
+    }
+  };
+
+  const handleDelete = async (id) => {
+    if (!window.confirm("Are you sure you want to delete this user?")) return;
+    try {
+      await axios.delete(`/api/admin/users/${id}`, { withCredentials: true });
+      fetchUsers(); // Refresh list
+    } catch (err) {
+      console.error("Error deleting user:", err);
     }
   };
 
@@ -32,47 +37,43 @@ const ManageUsers = () => {
   }, []);
 
   return (
-    <div className="p-6 w-full">
-      <h1 className="text-3xl font-bold mb-4">Manage Users</h1>
-      {loading ? (
-        <p>Loading users...</p>
-      ) : (
-        <table className="min-w-full bg-white border rounded-lg overflow-hidden">
-          <thead className="bg-gray-100 text-left">
+    <div>
+      <h1>Manage Users</h1>
+      <table>
+        <thead>
+          <tr>
+            <th>ID</th>
+            <th>Username</th>
+            <th>Email</th>
+            <th>Status</th>
+            <th>Action</th>
+          </tr>
+        </thead>
+        <tbody>
+          {users.length === 0 ? (
             <tr>
-              <th className="p-3">ID</th>
-              <th className="p-3">Username</th>
-              <th className="p-3">Email</th>
-              <th className="p-3">Action</th>
+              <td colSpan="5">No users found.</td>
             </tr>
-          </thead>
-          <tbody>
-            {users.length > 0 ? (
-              users.map(user => (
-                <tr key={user.id} className="border-t">
-                  <td className="p-3">{user.id}</td>
-                  <td className="p-3">{user.username}</td>
-                  <td className="p-3">{user.email}</td>
-                  <td className="p-3">
-                    <button
-                      className="bg-red-500 text-white px-3 py-1 rounded hover:bg-red-600"
-                      onClick={() => handleDelete(user.id)}
-                    >
-                      Delete
-                    </button>
-                  </td>
-                </tr>
-              ))
-            ) : (
-              <tr>
-                <td colSpan="4" className="text-center p-4">
-                  No users found.
+          ) : (
+            users.map((user) => (
+              <tr key={user.id}>
+                <td>{user.id}</td>
+                <td>{user.username}</td>
+                <td>{user.email}</td>
+                <td>{user.is_suspended ? "Suspended" : "Active"}</td>
+                <td>
+                  <button onClick={() => handleToggleSuspend(user.id)}>
+                    {user.is_suspended ? "Unsuspend" : "Suspend"}
+                  </button>
+                  <button onClick={() => handleDelete(user.id)} style={{ marginLeft: "10px" }}>
+                    Delete
+                  </button>
                 </td>
               </tr>
-            )}
-          </tbody>
-        </table>
-      )}
+            ))
+          )}
+        </tbody>
+      </table>
     </div>
   );
 };
