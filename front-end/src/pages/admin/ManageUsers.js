@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from "react";
 import axios from "axios";
+import "./ManageUsers.css"; // Optional: if you want to keep CSS separate
 
 const ManageUsers = () => {
   const [users, setUsers] = useState([]);
@@ -37,22 +38,22 @@ const ManageUsers = () => {
   }, []);
 
   return (
-    <div>
-      <h1>Manage Users</h1>
-      <table>
-        <thead>
+    <div className="container mt-4">
+      <h2 className="mb-4">Manage Users</h2>
+      <table className="table table-bordered table-hover">
+        <thead className="table-primary">
           <tr>
             <th>ID</th>
             <th>Username</th>
             <th>Email</th>
             <th>Status</th>
-            <th>Action</th>
+            <th style={{ textAlign: "center" }}>Action</th>
           </tr>
         </thead>
         <tbody>
           {users.length === 0 ? (
             <tr>
-              <td colSpan="5">No users found.</td>
+              <td colSpan="5" className="text-center py-4">No users found.</td>
             </tr>
           ) : (
             users.map((user) => (
@@ -61,11 +62,17 @@ const ManageUsers = () => {
                 <td>{user.username}</td>
                 <td>{user.email}</td>
                 <td>{user.is_suspended ? "Suspended" : "Active"}</td>
-                <td>
-                  <button onClick={() => handleToggleSuspend(user.id)}>
+                <td style={{ textAlign: "center" }}>
+                  <button
+                    className={`btn btn-sm ${user.is_suspended ? "btn-success" : "btn-warning"}`}
+                    onClick={() => handleToggleSuspend(user.id)}
+                  >
                     {user.is_suspended ? "Unsuspend" : "Suspend"}
                   </button>
-                  <button onClick={() => handleDelete(user.id)} style={{ marginLeft: "10px" }}>
+                  <button
+                    className="btn btn-sm btn-danger ms-2"
+                    onClick={() => handleDelete(user.id)}
+                  >
                     Delete
                   </button>
                 </td>

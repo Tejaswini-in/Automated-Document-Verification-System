@@ -1,0 +1,17 @@
+.container {
+    padding: 20px;
+  }
+  
+  table th, table td {
+    padding: 12px;
+    vertical-align: middle;
+  }
+  
+  .table th {
+    background-color: #f8f9fa;
+  }
+  
+  h2 {
+    font-weight: bold;
+  }
+  
