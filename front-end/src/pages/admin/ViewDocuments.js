@@ -1,107 +1,81 @@
 import React, { useEffect, useState } from "react";
 import axios from "axios";
-import AdminSidebar from "../../components/AdminSidebar";
+import "./ManageUsers.css"; // Reuse the same CSS for consistent UI
 
 const ViewDocuments = () => {
-  const [docs, setDocs] = useState([]);
-  const [loading, setLoading] = useState(true); // For loading state
-  const [error, setError] = useState(null); // For handling errors
+  const [documents, setDocuments] = useState([]);
 
-  // Fetch documents from backend API
-  const fetchDocs = async () => {
+  const fetchDocuments = async () => {
     try {
-      const res = await axios.get("http://localhost:5000/api/admin/documents");
-      setDocs(res.data);
+      const res = await axios.get("/api/user/documents", { withCredentials: true });
+      setDocuments(res.data.documents);
     } catch (err) {
-      setError("Failed to fetch documents");
       console.error("Error fetching documents:", err);
-    } finally {
-      setLoading(false);
     }
   };
 
-  // Verify document
-  const verifyDoc = async (id) => {
+  const handleDelete = async (id) => {
+    if (!window.confirm("Are you sure you want to delete this document?")) return;
     try {
-      await axios.put(`http://localhost:5000/api/admin/documents/${id}/verify`);
-      fetchDocs();
+      await axios.delete(`/api/user/documents/${id}`, { withCredentials: true });
+      fetchDocuments(); // Refresh list
     } catch (err) {
-      setError("Failed to verify document");
-      console.error("Error verifying document:", err);
-    }
-  };
-
-  // Delete document
-  const deleteDoc = async (id) => {
-    try {
-      await axios.delete(`http://localhost:5000/api/admin/documents/${id}`);
-      fetchDocs();
-    } catch (err) {
-      setError("Failed to delete document");
       console.error("Error deleting document:", err);
     }
   };
 
   useEffect(() => {
-    fetchDocs();
+    fetchDocuments();
   }, []);
 
-  if (loading) {
-    return <div>Loading...</div>; // Display loading message
-  }
-
   return (
-    <div className="row">
-      <div className="col-md-3">
-        <AdminSidebar />
-      </div>
-      <div className="col-md-9">
-        <h4>View Documents</h4>
-        
-        {error && <div className="alert alert-danger">{error}</div>} {/* Display error message */}
-
-        <table className="table">
-          <thead>
+    <div className="container mt-4">
+      <h2 className="mb-4">View Uploaded Documents</h2>
+      <table className="table table-bordered table-hover">
+        <thead className="table-primary">
+          <tr>
+            <th>ID</th>
+            <th>Document Name</th>
+            <th>Type</th>
+            <th>Status</th>
+            <th>Uploaded At</th>
+            <th style={{ textAlign: "center" }}>Action</th>
+          </tr>
+        </thead>
+        <tbody>
+          {documents.length === 0 ? (
             <tr>
-              <th>ID</th>
-              <th>Type</th>
-              <th>Status</th>
-              <th>Action</th>
+              <td colSpan="6" className="text-center py-4">No documents found.</td>
             </tr>
-          </thead>
-          <tbody>
-            {docs.length === 0 ? (
-              <tr>
-                <td colSpan="4">No documents found</td> {/* Message when no documents exist */}
+          ) : (
+            documents.map((doc) => (
+              <tr key={doc.id}>
+                <td>{doc.id}</td>
+                <td>{doc.name}</td>
+                <td>{doc.type}</td>
+                <td>{doc.status}</td>
+                <td>{new Date(doc.uploaded_at).toLocaleString()}</td>
+                <td style={{ textAlign: "center" }}>
+                  <a
+                    href={doc.file_url}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="btn btn-sm btn-info"
+                  >
+                    View
+                  </a>
+                  <button
+                    className="btn btn-sm btn-danger ms-2"
+                    onClick={() => handleDelete(doc.id)}
+                  >
+                    Delete
+                  </button>
+                </td>
               </tr>
-            ) : (
-              docs.map((d) => (
-                <tr key={d.id}>
-                  <td>{d.id}</td>
-                  <td>{d.doc_type}</td>
-                  <td>{d.status}</td>
-                  <td>
-                    {d.status !== "verified" && (
-                      <button
-                        className="btn btn-success btn-sm me-2"
-                        onClick={() => verifyDoc(d.id)}
-                      >
-                        Verify
-                      </button>
-                    )}
-                    <button
-                      className="btn btn-danger btn-sm"
-                      onClick={() => deleteDoc(d.id)}
-                    >
-                      Delete
-                    </button>
-                  </td>
-                </tr>
-              ))
-            )}
-          </tbody>
-        </table>
-      </div>
+            ))
+          )}
+        </tbody>
+      </table>
     </div>
   );
 };

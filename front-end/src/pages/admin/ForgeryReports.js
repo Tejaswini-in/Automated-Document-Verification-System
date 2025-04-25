@@ -1,13 +1,17 @@
 import React, { useEffect, useState } from "react";
 import axios from "axios";
-import AdminSidebar from "../../components/AdminSidebar";
+import "./ManageUsers.css"; // Reusing ManageUsers style for consistent UI
 
-const ForgeryReports = () => {
+const ForgeryDetection = () => {
   const [reports, setReports] = useState([]);
 
   const fetchReports = async () => {
-    const res = await axios.get("http://localhost:5000/api/admin/reports");
-    setReports(res.data);
+    try {
+      const res = await axios.get("/api/admin/reports", { withCredentials: true });
+      setReports(res.data.reports || []);
+    } catch (err) {
+      console.error("Error fetching forgery reports:", err);
+    }
   };
 
   useEffect(() => {
@@ -15,26 +19,38 @@ const ForgeryReports = () => {
   }, []);
 
   return (
-    <div className="row">
-      <div className="col-md-3"><AdminSidebar /></div>
-      <div className="col-md-9">
-        <h4>Forgery Detection Reports</h4>
-        <table className="table">
-          <thead><tr><th>ID</th><th>Type</th><th>Status</th><th>Result</th></tr></thead>
-          <tbody>
-            {reports.map(r => (
-              <tr key={r.id}>
-                <td>{r.id}</td>
-                <td>{r.type}</td>
-                <td>{r.status}</td>
-                <td>{r.result}</td>
+    <div className="container mt-4">
+      <h2 className="mb-4">Forgery Detection Reports</h2>
+      <table className="table table-bordered table-hover">
+        <thead className="table-primary">
+          <tr>
+            <th>ID</th>
+            <th>Username</th>
+            <th>Document Type</th>
+            <th>Status</th>
+            <th>Result</th>
+          </tr>
+        </thead>
+        <tbody>
+          {reports.length === 0 ? (
+            <tr>
+              <td colSpan="5" className="text-center py-4">No reports found.</td>
+            </tr>
+          ) : (
+            reports.map((report) => (
+              <tr key={report.id}>
+                <td>{report.id}</td>
+                <td>{report.username}</td>
+                <td>{report.type}</td>
+                <td>{report.status}</td>
+                <td>{report.result}</td>
               </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
+            ))
+          )}
+        </tbody>
+      </table>
     </div>
   );
 };
 
-export default ForgeryReports;
+export default ForgeryDetection;
