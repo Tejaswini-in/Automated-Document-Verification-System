@@ -1,13 +1,32 @@
+/* Dropdown items */
 .dropdown-item {
   display: block;
   padding: 8px 12px;
   color: #333;
   text-decoration: none;
   font-size: 14px;
+  transition: background-color 0.3s, color 0.3s; /* Smooth hover */
 }
 
 .dropdown-item:hover {
   background-color: #007bff;
   color: white;
   border-radius: 4px;
+}
+
+/* Dropdown menu animation */
+.custom-dropdown {
+  animation: fadeSlideDown 0.3s ease forwards;
+}
+
+/* Keyframes for dropdown fade + slide */
+@keyframes fadeSlideDown {
+  from {
+    opacity: 0;
+    transform: translateY(-10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }

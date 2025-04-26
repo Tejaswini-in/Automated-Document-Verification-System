@@ -1,7 +1,7 @@
 import React, { useEffect, useState, useRef } from "react";
 import axios from "axios";
 import { Link } from "react-router-dom";
-import "./ViewDocuments.css"; // using your existing CSS
+import "./ViewDocuments.css";
 
 const ViewDocuments = () => {
   const [documents, setDocuments] = useState([]);
@@ -31,7 +31,7 @@ const ViewDocuments = () => {
     fetchDocuments();
   }, []);
 
-  // Auto-close dropdown if click outside
+  // Close dropdown if clicking outside
   useEffect(() => {
     const handleClickOutside = (event) => {
       if (dropdownRef.current && !dropdownRef.current.contains(event.target)) {
@@ -50,9 +50,9 @@ const ViewDocuments = () => {
 
   return (
     <div className="container mt-4">
-      {/* Dropdown Button at Top Left */}
-      <div className="d-flex justify-content-start mb-2" ref={dropdownRef}>
-        <div className="position-relative">
+      {/* Dropdown Button on Top Left */}
+      <div className="d-flex justify-content-start mb-2">
+        <div className="position-relative" ref={dropdownRef}>
           <button
             className="btn btn-primary btn-sm"
             onClick={toggleDropdown}
@@ -61,19 +61,18 @@ const ViewDocuments = () => {
           </button>
           {dropdownOpen && (
             <div
-              className="dropdown-menu show p-2"
+              className="dropdown-menu show p-2 custom-dropdown"
               style={{
                 position: "absolute",
                 top: "40px",
-                left: 0, // dropdown opens left
-                minWidth: "150px",
+                left: 0,
+                minWidth: "160px",
                 backgroundColor: "#f8f9fa",
                 border: "1px solid #ccc",
                 borderRadius: "5px",
                 zIndex: 1000,
               }}
             >
-          
               <Link to="/admin/manage-users" className="dropdown-item">Manage Users</Link>
               <Link to="/admin/view-documents" className="dropdown-item">View Documents</Link>
               <Link to="/admin/forgery-reports" className="dropdown-item">Forgery Reports</Link>
