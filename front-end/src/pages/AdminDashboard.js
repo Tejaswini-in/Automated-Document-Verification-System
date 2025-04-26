@@ -8,16 +8,16 @@ const AdminDashboard = () => {
       <p>Welcome, Admin! Here you can manage users, documents, and review verification reports.</p>
       <ul className="list-group">
         <li className="list-group-item">
-          <Link to="/admin/manage-users">📋 Manage Users</Link>
+          <Link to="/admin/manage-users">📋 <b>Manage Users</b> </Link>
         </li>
         <li className="list-group-item">
-          <Link to="/admin/view-documents">📄 View Documents</Link>
+          <Link to="/admin/view-documents">📄<b>View Documents</b> </Link>
         </li>
         <li className="list-group-item">
-          <Link to="/admin/forgery-reports">🔍 AI Forgery Reports</Link>
+          <Link to="/admin/forgery-reports">🔍<b>AI Forgery Reports</b> </Link>
         </li>
         <li className="list-group-item">
-          <Link to="/admin/audit-logs">🕵️ Audit Logs</Link>
+          <Link to="/admin/audit-logs">🕵️ <b>Audit Logs</b></Link>
         </li>
       </ul>
     </div>
