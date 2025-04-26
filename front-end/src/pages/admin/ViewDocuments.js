@@ -1,9 +1,12 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, useRef } from "react";
 import axios from "axios";
-import "./ManageUsers.css"; // Reuse the same CSS for consistent UI
+import { Link } from "react-router-dom";
+import "./ViewDocuments.css"; // using your existing CSS
 
 const ViewDocuments = () => {
   const [documents, setDocuments] = useState([]);
+  const [dropdownOpen, setDropdownOpen] = useState(false);
+  const dropdownRef = useRef(null);
 
   const fetchDocuments = async () => {
     try {
@@ -18,7 +21,7 @@ const ViewDocuments = () => {
     if (!window.confirm("Are you sure you want to delete this document?")) return;
     try {
       await axios.delete(`/api/user/documents/${id}`, { withCredentials: true });
-      fetchDocuments(); // Refresh list
+      fetchDocuments();
     } catch (err) {
       console.error("Error deleting document:", err);
     }
@@ -28,9 +31,62 @@ const ViewDocuments = () => {
     fetchDocuments();
   }, []);
 
+  // Auto-close dropdown if click outside
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      if (dropdownRef.current && !dropdownRef.current.contains(event.target)) {
+        setDropdownOpen(false);
+      }
+    };
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => {
+      document.removeEventListener("mousedown", handleClickOutside);
+    };
+  }, []);
+
+  const toggleDropdown = () => {
+    setDropdownOpen(!dropdownOpen);
+  };
+
   return (
     <div className="container mt-4">
-      <h2 className="mb-4">View Uploaded Documents</h2>
+      {/* Dropdown Button at Top Left */}
+      <div className="d-flex justify-content-start mb-2" ref={dropdownRef}>
+        <div className="position-relative">
+          <button
+            className="btn btn-primary btn-sm"
+            onClick={toggleDropdown}
+          >
+            ☰
+          </button>
+          {dropdownOpen && (
+            <div
+              className="dropdown-menu show p-2"
+              style={{
+                position: "absolute",
+                top: "40px",
+                left: 0, // dropdown opens left
+                minWidth: "150px",
+                backgroundColor: "#f8f9fa",
+                border: "1px solid #ccc",
+                borderRadius: "5px",
+                zIndex: 1000,
+              }}
+            >
+          
+              <Link to="/admin/manage-users" className="dropdown-item">Manage Users</Link>
+              <Link to="/admin/view-documents" className="dropdown-item">View Documents</Link>
+              <Link to="/admin/forgery-reports" className="dropdown-item">Forgery Reports</Link>
+              <Link to="/admin/audit-logs" className="dropdown-item">Audit Logs</Link>
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* Page Heading */}
+      <h2 className="mb-4 text-center">View Uploaded Documents</h2>
+
+      {/* Documents Table */}
       <table className="table table-bordered table-hover">
         <thead className="table-primary">
           <tr>
@@ -45,7 +101,9 @@ const ViewDocuments = () => {
         <tbody>
           {documents.length === 0 ? (
             <tr>
-              <td colSpan="6" className="text-center py-4">No documents found.</td>
+              <td colSpan="6" className="text-center py-4">
+                No documents found.
+              </td>
             </tr>
           ) : (
             documents.map((doc) => (
