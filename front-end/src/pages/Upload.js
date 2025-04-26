@@ -38,6 +38,7 @@ const Upload = () => {
             <th>Document Type</th>
             <th>Document Name</th>
             <th>Status</th>
+            <th>Verified By</th> {/* Added new column */}
             <th>Uploaded At</th>
             <th style={{ textAlign: "center" }}>Action</th>
           </tr>
@@ -45,7 +46,7 @@ const Upload = () => {
         <tbody>
           {documents.length === 0 ? (
             <tr>
-              <td colSpan="6" className="text-center py-4">No documents found.</td>
+              <td colSpan="7" className="text-center py-4">No documents found.</td> {/* updated colSpan */}
             </tr>
           ) : (
             documents.map((doc, index) => (
@@ -54,6 +55,7 @@ const Upload = () => {
                 <td>{doc.type}</td>
                 <td>{doc.name}</td>
                 <td>{doc.status}</td>
+                <td>{doc.verified_by || "Pending"}</td> {/* Showing Verified By */}
                 <td>{new Date(doc.uploaded_at).toLocaleString()}</td>
                 <td style={{ textAlign: "center" }}>
                   <a
