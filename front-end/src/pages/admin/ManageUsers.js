@@ -1,9 +1,12 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, useRef } from "react";
 import axios from "axios";
-import "./ManageUsers.css"; // Optional: if you want to keep CSS separate
+import { Link } from "react-router-dom";
+import "./ManageUsers.css"; // Optional: CSS
 
 const ManageUsers = () => {
   const [users, setUsers] = useState([]);
+  const [dropdownOpen, setDropdownOpen] = useState(false);
+  const dropdownRef = useRef(null);
 
   const fetchUsers = async () => {
     try {
@@ -17,7 +20,7 @@ const ManageUsers = () => {
   const handleToggleSuspend = async (id) => {
     try {
       await axios.post(`/api/admin/users/${id}/suspend-toggle`, {}, { withCredentials: true });
-      fetchUsers(); // Refresh list
+      fetchUsers();
     } catch (err) {
       console.error("Error toggling suspend:", err);
     }
@@ -27,7 +30,7 @@ const ManageUsers = () => {
     if (!window.confirm("Are you sure you want to delete this user?")) return;
     try {
       await axios.delete(`/api/admin/users/${id}`, { withCredentials: true });
-      fetchUsers(); // Refresh list
+      fetchUsers();
     } catch (err) {
       console.error("Error deleting user:", err);
     }
@@ -37,9 +40,61 @@ const ManageUsers = () => {
     fetchUsers();
   }, []);
 
+  // Close dropdown if clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      if (dropdownRef.current && !dropdownRef.current.contains(event.target)) {
+        setDropdownOpen(false);
+      }
+    };
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => {
+      document.removeEventListener("mousedown", handleClickOutside);
+    };
+  }, []);
+
+  const toggleDropdown = () => {
+    setDropdownOpen(!dropdownOpen);
+  };
+
   return (
     <div className="container mt-4">
-      <h2 className="mb-4">Manage Users</h2>
+      {/* Dropdown Button on Top Left */}
+      <div className="d-flex justify-content-start mb-2">
+        <div className="position-relative" ref={dropdownRef}>
+          <button
+            className="btn btn-primary btn-sm"
+            onClick={toggleDropdown}
+          >
+            ☰
+          </button>
+          {dropdownOpen && (
+            <div
+              className="dropdown-menu show p-2 custom-dropdown"
+              style={{
+                position: "absolute",
+                top: "40px",
+                left: 0,
+                minWidth: "160px",
+                backgroundColor: "#f8f9fa",
+                border: "1px solid #ccc",
+                borderRadius: "5px",
+                zIndex: 1000,
+              }}
+            >
+              <Link to="/admin/manage-users" className="dropdown-item">Manage Users</Link>
+              <Link to="/admin/view-documents" className="dropdown-item">View Documents</Link>
+              <Link to="/admin/forgery-reports" className="dropdown-item">Forgery Reports</Link>
+              <Link to="/admin/audit-logs" className="dropdown-item">Audit Logs</Link>
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* Page Heading */}
+      <h2 className="mb-4 text-center">Manage Users</h2>
+
+      {/* Users Table */}
       <table className="table table-bordered table-hover">
         <thead className="table-primary">
           <tr>
