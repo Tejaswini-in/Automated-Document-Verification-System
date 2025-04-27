@@ -55,7 +55,6 @@ const Upload = () => {
                 <td>{doc.type}</td>
                 <td>{doc.name}</td>
                 <td>{doc.status}</td>
-                <td>{doc.verified_by || "Pending"}</td> {/* Showing Verified By */}
                 <td>{new Date(doc.uploaded_at).toLocaleString()}</td>
                 <td style={{ textAlign: "center" }}>
                   <a
