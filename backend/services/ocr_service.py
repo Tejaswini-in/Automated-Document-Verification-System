@@ -5,7 +5,7 @@ from pdf2image import convert_from_path
 
 
 # Set correct paths
-pytesseract.pytesseract.tesseract_cmd = r"C:\Users\User\Downloads\tesseract.exe"
+pytesseract.pytesseract.tesseract_cmd = r"C:\Program Files\Tesseract-OCR\tesseract.exe"
 poppler_path = r"C:\Users\User\Downloads\Release-24.08.0-0\poppler-24.08.0\Library\bin"  # Change to your actual Poppler path
 
 def extract_text(file_path):

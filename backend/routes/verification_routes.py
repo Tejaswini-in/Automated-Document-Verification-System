@@ -5,6 +5,7 @@ from werkzeug.utils import secure_filename
 from database import db
 from models.document import Document
 from services.ocr_service import extract_text
+from services.verify_document import verify_document  # At the top with other imports
 
 verify_bp = Blueprint('verify', __name__)
 
@@ -16,7 +17,7 @@ def upload_document():
 
         # Extract the file and doc_type from the request
         file = request.files.get('file')
-        doc_type = request.form.get('doc_type')
+        doc_type = request.form.get('doc_type', '').strip().lower()
 
         # Validate if the file and document type are present
         if not file:
@@ -38,19 +39,12 @@ def upload_document():
         file.save(file_path)
 
         print(f"[STEP 2] File saved to: {file_path}")
-        print("[STEP 3] Starting OCR...")
+        print("[STEP 3] Starting Verification...")
 
-        # Extract text from the uploaded file using OCR
-        extracted_text = extract_text(file_path)
+        # Run full verification
+        status, extracted_text = verify_document(file_path, doc_type)
 
         print(f"[STEP 4] OCR Result:\n{extracted_text}")
-
-        # Handle OCR failure
-        if extracted_text.startswith("ERROR:"):
-            status = "Rejected"
-        else:
-            status = "Verified" if len(extracted_text.strip()) > 20 else "Rejected"
-
         print(f"[STEP 5] Status: {status}")
 
         # Save document details to the database

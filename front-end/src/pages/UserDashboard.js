@@ -34,10 +34,10 @@ const UserDashboard = () => {
 
       const { status, extracted } = response.data;
 
-      if (status === "Verified") {
-        setMessage(`✅ Verified: ${status}\n\n📄 Extracted Text:\n${extracted}`);
+      if (status.toLowerCase().includes("verified")) {
+        setMessage(`✅ ${status}\n\n📄 Extracted Text:\n${extracted}`);
       } else {
-        setMessage(`❌ Rejected: ${status}\n\n📄 Extracted Text:\n${extracted}`);
+        setMessage(`❌ ${status}\n\n📄 Extracted Text:\n${extracted}`);
       }
     } catch (err) {
       console.error(err);
