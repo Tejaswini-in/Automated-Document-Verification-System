@@ -6,6 +6,10 @@ import re
 from difflib import SequenceMatcher
 import cv2
 import numpy as np
+from models.data import Data
+from database import db
+
+from services.ocr_service import extract_text_from_image
 
 def clean_text(text):
     """Remove non-alphanumeric characters and normalize whitespace."""
@@ -35,78 +39,310 @@ def preprocess_image(path):
     _, thresh = cv2.threshold(blur, 0, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU)
     return Image.fromarray(thresh)
 
+def extract_aadhaar_name(text):
+    """Extract name from Aadhaar card text format."""
+    # Split text into lines and clean them
+    lines = [line.strip() for line in text.upper().split('\n') if line.strip()]
+    
+    for i, line in enumerate(lines):
+        # Look for lines that come right before DOB
+        if i + 1 < len(lines) and "DOB:" in lines[i + 1]:
+            # This line is likely the English name
+            # Remove any common prefixes/suffixes
+            name = line.strip()
+            # Clean up any extra spaces
+            name = ' '.join(word for word in name.split() if not any(x in word for x in ["DOB:", "/DOB", "MALE", "FEMALE"]))
+            if len(name.split()) >= 2:  # Ensure we have at least two parts in the name
+                return name
+            
+        # Alternative method: Look for lines with multiple words between Government of India and DOB
+        if "GOVERNMENT OF INDIA" in line or "UNIQUE IDENTIFICATION" in line:
+            # Check next few lines for name
+            for j in range(i+1, min(i+4, len(lines))):
+                if "DOB:" in lines[j]:
+                    break
+                potential_name = lines[j].strip()
+                # Skip lines with common Aadhaar card text
+                if any(x in potential_name for x in ["GOVERNMENT", "UNIQUE", "ADDRESS:", "AADHAAR", "MALE", "FEMALE", "DOB:"]):
+                    continue
+                if len(potential_name.split()) >= 2:
+                    return potential_name
+    
+    return None
+
+def clean_voter_id(text):
+    """Clean voter ID by removing spaces and special characters."""
+    # Remove spaces and special characters
+    cleaned = re.sub(r'[^A-Z0-9]', '', text.upper())
+    return cleaned
+
+def test_voter_id_pattern(voter_id):
+    """Test if a voter ID matches the expected pattern."""
+    # Pattern: 3 letters + 1 letter/number + 6 numbers
+    pattern = re.compile(r'\b[A-Z]{3}[A-Z0-9]\d{6}\b')
+    match = pattern.match(voter_id)
+    if match:
+        return True, match.group(0)
+    return False, None
+
+def extract_voter_id_details(text):
+    """Extract voter ID number and name from the text."""
+    details = {
+        'voter_id': None,
+        'name': None
+    }
+    
+    # Split text into lines and clean them
+    lines = [line.strip() for line in text.upper().split('\n') if line.strip()]
+    
+    # Look for voter ID number (e.g., GDNO225185 format)
+    # Pattern: 3 letters + 1 letter/number + 6 numbers
+    voter_id_pattern = re.compile(r'\b[A-Z]{3}[A-Z0-9]\d{6}\b')
+    
+    # Look for name after "ELECTOR'S NAME :" or similar patterns
+    name_patterns = [
+        r"ELECTOR'S NAME\s*[:.-]\s*(.*?)(?:\s*\n|$)",
+        r"ELECTOR'S NAME\s*[:-]\s*(.*?)(?:\s*\n|$)",
+        r"ELECTOR NAME\s*[:.-]\s*(.*?)(?:\s*\n|$)",
+        r"ELECTOR.*NAME.*[:.-]\s*(.*?)(?:\s*\n|$)"  # More flexible pattern
+    ]
+    
+    # Search in each line
+    for line in lines:
+        # Search for voter ID
+        if not details['voter_id']:
+            voter_match = voter_id_pattern.search(line)
+            if voter_match:
+                # Clean the voter ID by removing spaces and special characters
+                voter_id = clean_voter_id(voter_match.group(0))
+                if len(voter_id) == 10:  # Must be exactly 10 characters
+                    details['voter_id'] = voter_id
+                    print(f"Found voter ID match: {voter_id}")
+                    print(f"  First 3 letters: {voter_id[:3]}")
+                    print(f"  Fourth character (letter/number): {voter_id[3]}")
+                    print(f"  Last 6 digits: {voter_id[4:]}")
+        
+        # Search for name
+        if not details['name']:
+            for pattern in name_patterns:
+                name_match = re.search(pattern, line, re.IGNORECASE)
+                if name_match:
+                    # Clean the name by removing special characters but keep spaces
+                    name = re.sub(r'[^A-Z\s]', '', name_match.group(1).upper()).strip()
+                    if len(name.split()) >= 2:  # Ensure we have at least two parts in the name
+                        details['name'] = name
+                        break
+    
+    # Debug output
+    print(f"Extracted Voter ID: {details['voter_id']}")
+    print(f"Extracted Name: {details['name']}")
+    
+    return details
+
+def extract_pan_name(text):
+    """Extract name from PAN card text format."""
+    # Split text into lines and clean them
+    lines = [line.strip() for line in text.upper().split('\n') if line.strip()]
+    
+    # Look for name after patterns like "NAME" or between "NAME" and "FATHER"
+    name_patterns = [
+        r"NAME[:\s]+([A-Z\s]+?)(?:\s*(?:FATHER|FLAT|DOB|DATE|/|\n|$))",
+        r"\bNAME\b[:\s]*([A-Z\s]+)",
+        r"(?<=\bNAME\b)[\s:]+([A-Z\s]+)"
+    ]
+    
+    for line in lines:
+        # First try to find name in current line using patterns
+        for pattern in name_patterns:
+            name_match = re.search(pattern, line)
+            if name_match:
+                name = name_match.group(1).strip()
+                if len(name.split()) >= 2:  # Ensure we have at least two parts in the name
+                    return name
+        
+        # If no pattern matched but line is between "NAME" and "FATHER"
+        if "NAME" in line:
+            # Look at next line for name
+            next_idx = lines.index(line) + 1
+            if next_idx < len(lines):
+                next_line = lines[next_idx].strip()
+                # Check if next line looks like a name (no special chars, multiple words)
+                if re.match(r'^[A-Z\s]+$', next_line) and len(next_line.split()) >= 2:
+                    return next_line
+    
+    return None
 
 def verify_document(doc_path, doc_type):
     try:
-        # Step 1: OCR - Extract text from image or PDF
-        if doc_path.lower().endswith('.pdf'):
-            images = convert_from_path(doc_path)
-            extracted_text = ''
-            for image in images:
-                extracted_text += pytesseract.image_to_string(image, config='--psm 6')
-        else:
-            image = preprocess_image(doc_path)
-            extracted_text = pytesseract.image_to_string(image, config='--psm 6')
-
-        extracted_text = extracted_text.upper()
+        # Extract text using OCR
+        text = extract_text_from_image(doc_path)
+        extracted_text = text.upper()
+        print(f"Extracted Text: {extracted_text}")
         status = "Rejected"
-
+        
         # Aadhaar
         if doc_type == 'aadhaar':
-            aadhaar_keywords = ["AADHAAR", "UNIQUE IDENTIFICATION", "VID", "GOVERNMENT OF INDIA"]
-            aadhaar_number = re.search(r'\b\d{4}\s\d{4}\s\d{4}\b', extracted_text)
-            if any(fuzzy_match(extracted_text, k) for k in aadhaar_keywords) and aadhaar_number:
-                status = "Verified as Aadhaar Card"
+            # First try to find the Aadhaar number
+            aadhaar_match = re.search(r'\b\d{4}\s\d{4}\s\d{4}\b', extracted_text)
+            if not aadhaar_match:
+                return "Rejected", "Could not find valid Aadhaar number in document"
+                
+            aadhaar_number = aadhaar_match.group(0)
+            print(f"Found Aadhaar Number: {aadhaar_number}")
+            
+            # Check if this ID exists in database
+            record = Data.query.filter_by(id_number=aadhaar_number).first()
+            if not record:
+                return "Rejected", "No matching Aadhaar record found in database"
+                
+            # Verify document type
+            if record.document_type != 'aadhaar':
+                return "Rejected", "Document type mismatch"
+                
+            # Now extract and verify name
+            name = extract_aadhaar_name(extracted_text)
+            if not name:
+                return "Rejected", "Could not extract name from document"
+                
+            print(f"Extracted Name: {name}")
+            
+            # Compare names using fuzzy matching
+            name_similarity = SequenceMatcher(None, 
+                                        clean_text(name), 
+                                        clean_text(record.name)).ratio()
+            
+            if name_similarity >= 0.8:  # 80% similarity threshold
+                status = "Verified"
+                return status, f"Document verified successfully. Matched record for {name}"
             else:
-                status = "Invalid document for Aadhaar Card"
+                return "Rejected", "Name in document does not match records"
 
         # PAN
         elif doc_type == 'pan':
-            pan_keywords = ["INCOME TAX DEPARTMENT", "PERMANENT ACCOUNT NUMBER", "INCOME TAX"]
-            pan_number = re.search(r'\b[A-Z]{5}[0-9]{4}[A-Z]\b', extracted_text)
-            if any(fuzzy_match(extracted_text, k) for k in pan_keywords) and pan_number:
-                status = "Verified as PAN Card"
+            # First try to find PAN number
+            pan_match = re.search(r'\b[A-Z]{5}[0-9]{4}[A-Z]\b', extracted_text)
+            if not pan_match:
+                return "Rejected", "Could not find valid PAN number in document"
+                
+            pan_number = pan_match.group(0)
+            print(f"Found PAN Number: {pan_number}")
+            
+            # Extract name from PAN card
+            name = extract_pan_name(extracted_text)
+            if not name:
+                print("Could not extract name from PAN card")
+                return "Rejected", "Could not extract name from document"
+            
+            print(f"Extracted Name: {name}")
+            
+            # Check if this ID exists in database
+            record = Data.query.filter_by(id_number=pan_number).first()
+            if not record:
+                return "Rejected", "No matching PAN record found in database"
+                
+            # Verify document type
+            if record.document_type != 'pan':
+                return "Rejected", "Document type mismatch"
+            
+            # Compare names using fuzzy matching
+            doc_name = clean_text(name)
+            db_name = clean_text(record.name)
+            print(f"Comparing names: '{doc_name}' with '{db_name}'")
+            
+            name_similarity = SequenceMatcher(None, doc_name, db_name).ratio()
+            print(f"Name similarity: {name_similarity}")
+            
+            if name_similarity >= 0.8:  # 80% similarity threshold
+                return "Verified", f"PAN Card verified successfully. Matched record for {name}"
             else:
-                status = "Invalid document for PAN Card"
+                return "Rejected", "Name in document does not match records"
 
         # Driving License
         elif doc_type == 'driving_license':
-            dl_keywords = ["DRIVING LICENCE", "DRIVING LICENSE", "TRANSPORT", "MOTOR VEHICLES", "UNION OF INDIA"]
-            # Use regex that allows optional space between state code and numbers
-            dl_number = re.search(r'\b[A-Z]{2}[0-9]{2}\s?[0-9]{11}\b', extracted_text)
+            # First try to find DL number
+            dl_match = re.search(r'\b[A-Z]{2}[0-9]{2}\s?[0-9]{11}\b', extracted_text)
+            if not dl_match:
+                return "Rejected", "Could not find valid Driving License number in document"
+                
+            dl_number = dl_match.group(0)
+            print(f"Found DL Number: {dl_number}")
             
-            if any(fuzzy_match(extracted_text, k) for k in dl_keywords) and dl_number:
-                status = "Verified as Driving License"
-            else:
-                status = "Invalid document for Driving License"
+            # Check if this ID exists in database
+            record = Data.query.filter_by(id_number=dl_number).first()
+            if not record:
+                return "Rejected", "No matching Driving License record found in database"
+                
+            # Verify document type
+            if record.document_type != 'driving_license':
+                return "Rejected", "Document type mismatch"
+                
+            return "Verified", "Driving License verified successfully"
 
         # Voter ID
         elif doc_type == 'voter_id':
-            voter_keywords = ["ELECTION COMMISSION", "VOTER", "PHOTO IDENTITY CARD", "ELECTOR"]
-            epic_number = re.search(r'\b[A-Z]{3}[0-9]{7}\b', extracted_text)
-            if any(fuzzy_match(extracted_text, k) for k in voter_keywords) and epic_number:
-                status = "Verified as Voter ID"
-            else:
-                status = "Invalid document for Voter ID"
+            # Extract voter ID details
+            details = extract_voter_id_details(extracted_text)
+            
+            if not details['voter_id']:
+                print("Failed to extract voter ID. Full text:", extracted_text)
+                return "Rejected", "Could not find valid Voter ID number in document"
+                
+            voter_number = details['voter_id']
+            print(f"Found Voter ID Number: {voter_number}")
+            
+            # Check if this ID exists in database
+            record = Data.query.filter_by(id_number=voter_number).first()
+            if not record:
+                return "Rejected", "No matching Voter ID record found in database"
+                
+            # Verify document type
+            if record.document_type != 'voter_id':
+                return "Rejected", "Document type mismatch"
+            
+            # If name was extracted, verify it
+            if details['name']:
+                print(f"Extracted Name: {details['name']}")
+                # Clean both names for comparison
+                doc_name = clean_text(details['name'])
+                db_name = clean_text(record.name)
+                print(f"Comparing names: '{doc_name}' with '{db_name}'")
+                
+                name_similarity = SequenceMatcher(None, doc_name, db_name).ratio()
+                print(f"Name similarity: {name_similarity}")
+                
+                if name_similarity >= 0.8:  # 80% similarity threshold
+                    return "Verified", f"Voter ID verified successfully. Matched record for {details['name']}"
+                else:
+                    return "Rejected", "Name in document does not match records"
+            
+            return "Verified", "Voter ID verified successfully"
 
         # Passport
         elif doc_type == 'passport':
-            # passport_keywords = ["PASSPORT", "REPUBLIC OF INDIA", "MINISTRY OF EXTERNAL AFFAIRS"]
-            # Match passport number (starts with a letter followed by 7 digits)
-            passport_number_match = re.search(r'\b([A-Z][0-9]{7})\b', extracted_text)
+            # First try to find Passport number
+            passport_match = re.search(r'\b([A-Z][0-9]{7})\b', extracted_text)
+            if not passport_match:
+                # Check for MRZ as fallback
+                mrz_match = re.search(r'[A-Z0-9<]{30,}', extracted_text)
+                if not mrz_match:
+                    return "Rejected", "Could not find valid Passport number in document"
+                return "Verified", "Passport format verified (MRZ found)"
+                
+            passport_number = passport_match.group(0)
+            print(f"Found Passport Number: {passport_number}")
             
-            # Try MRZ zone format detection (optional but strong signal)
-            mrz_match = re.search(r'[A-Z0-9<]{30,}', extracted_text)
-            
-            # Fuzzy keyword match + number or MRZ detected
-            if passport_number_match or mrz_match:
-                status = "Verified as Passport"
-            else:
-                status = "Invalid document for Passport"
+            # Check if this ID exists in database
+            record = Data.query.filter_by(id_number=passport_number).first()
+            if not record:
+                return "Rejected", "No matching Passport record found in database"
+                
+            # Verify document type
+            if record.document_type != 'passport':
+                return "Rejected", "Document type mismatch"
+                
+            return "Verified", "Passport verified successfully"
 
-        print(f"\n✅ Verification Status: {status}")
-        print(f"\n📄 Extracted Text:\n{extracted_text}")
-        return status, extracted_text
+        return status, "Invalid document type"
 
     except Exception as e:
         print(f"[ERROR] Document verification failed: {str(e)}")

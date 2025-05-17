@@ -33,11 +33,11 @@ const UserDashboard = () => {
       });
 
       const { status, extracted } = response.data;
-
+      console.log("extracted",extracted);
       if (status.toLowerCase().includes("verified")) {
-        setMessage(`✅ ${status}\n\n📄 Extracted Text:\n${extracted}`);
+        setMessage(`✅ ${status}\n`);
       } else {
-        setMessage(`❌ ${status}\n\n📄 Extracted Text:\n${extracted}`);
+        setMessage(`❌ ${status}\n`);
       }
     } catch (err) {
       console.error(err);

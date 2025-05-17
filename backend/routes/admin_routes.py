@@ -5,6 +5,7 @@ from flask import Blueprint, jsonify, request
 from models.user import User
 from models.document import Document
 from models.audit_log import AuditLog
+from models.data import Data
 from database import db
 
 admin_bp = Blueprint('admin', __name__)
@@ -14,6 +15,79 @@ def log_action(user_id, action):
     log = AuditLog(user_id=user_id, action=action)
     db.session.add(log)
     db.session.commit()
+
+# ------------------- Verification Data Management ------------------- #
+@admin_bp.route('/verification-data', methods=['GET'])
+def get_verification_data():
+    data = Data.query.all()
+    return jsonify([{
+        'id': record.id,
+        'name': record.name,
+        'id_number': record.id_number,
+        'document_type': record.document_type,
+        'created_at': record.created_at.strftime('%Y-%m-%d %H:%M:%S'),
+        'updated_at': record.updated_at.strftime('%Y-%m-%d %H:%M:%S')
+    } for record in data])
+
+@admin_bp.route('/verification-data', methods=['POST'])
+def add_verification_data():
+    try:
+        data = request.json
+        
+        # Check if record with this ID already exists
+        existing_record = Data.query.filter_by(id_number=data['id_number']).first()
+        
+        if existing_record:
+            # Update existing record
+            existing_record.name = data['name']
+            existing_record.document_type = data['document_type']
+            action = f"Updated verification data for {data['name']}"
+            message = "Verification data updated successfully"
+        else:
+            # Create new record
+            new_record = Data(
+                name=data['name'],
+                id_number=data['id_number'],
+                document_type=data['document_type'],
+                keywords=''  # Default empty string for keywords
+            )
+            db.session.add(new_record)
+            action = f"Added verification data for {data['name']}"
+            message = "Verification data added successfully"
+            
+        db.session.commit()
+        log_action(user_id=1, action=action)
+        return jsonify({'message': message})
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'error': str(e)}), 400
+
+@admin_bp.route('/verification-data/<int:id>', methods=['PUT'])
+def update_verification_data(id):
+    try:
+        record = Data.query.get_or_404(id)
+        data = request.json
+        record.name = data.get('name', record.name)
+        record.id_number = data.get('id_number', record.id_number)
+        record.document_type = data.get('document_type', record.document_type)
+        db.session.commit()
+        log_action(user_id=1, action=f"Updated verification data for {record.name}")
+        return jsonify({'message': 'Verification data updated successfully'})
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'error': str(e)}), 400
+
+@admin_bp.route('/verification-data/<int:id>', methods=['DELETE'])
+def delete_verification_data(id):
+    try:
+        record = Data.query.get_or_404(id)
+        db.session.delete(record)
+        db.session.commit()
+        log_action(user_id=1, action=f"Deleted verification data for {record.name}")
+        return jsonify({'message': 'Verification data deleted successfully'})
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'error': str(e)}), 400
 
 # ------------------- 1. Manage Users ------------------- #
 @admin_bp.route('/users', methods=['GET'])

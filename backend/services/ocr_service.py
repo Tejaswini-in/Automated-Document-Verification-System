@@ -8,6 +8,27 @@ from pdf2image import convert_from_path
 pytesseract.pytesseract.tesseract_cmd = r"C:\Program Files\Tesseract-OCR\tesseract.exe"
 poppler_path = r"C:\Users\User\Downloads\Release-24.08.0-0\poppler-24.08.0\Library\bin"  # Change to your actual Poppler path
 
+def extract_text_from_image(image_path):
+    """
+    Extract text from an image file.
+    
+    Args:
+        image_path (str): Path to the image file
+    
+    Returns:
+        str: Extracted text from the image
+    """
+    try:
+        # Open the image
+        img = Image.open(image_path)
+        
+        # Extract text from the image
+        text = pytesseract.image_to_string(img)
+        
+        return text.strip()
+    except Exception as e:
+        return f"Error processing {image_path}: {str(e)}"
+    
 def extract_text(file_path):
     try:
         print("📄 [OCR] File path received:", file_path)
