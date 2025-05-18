@@ -141,35 +141,90 @@ def extract_voter_id_details(text):
 
 def extract_pan_name(text):
     """Extract name from PAN card text format."""
+    print("[PAN DEBUG] Starting name extraction")
+    print("[PAN DEBUG] Input text:")
+    print(text)
+    
     # Split text into lines and clean them
     lines = [line.strip() for line in text.upper().split('\n') if line.strip()]
+    print(f"[PAN DEBUG] Found {len(lines)} non-empty lines")
     
-    # Look for name after patterns like "NAME" or between "NAME" and "FATHER"
+    # Common patterns found in PAN cards
     name_patterns = [
-        r"NAME[:\s]+([A-Z\s]+?)(?:\s*(?:FATHER|FLAT|DOB|DATE|/|\n|$))",
-        r"\bNAME\b[:\s]*([A-Z\s]+)",
-        r"(?<=\bNAME\b)[\s:]+([A-Z\s]+)"
+        r"NAME\s*[:.-]*\s*([A-Z\s]+?)(?:\s*(?:FATHER|LAST|SURNAME|DOB|DATE|/|\n|$))",
+        r"\bNAME\b[:\s.-]*([A-Z\s]+?)(?:\s*(?:FATHER|LAST|SURNAME|DOB|DATE|/|\n|$))",
+        r"(?<=\bNAME\b)[\s:.-]*([A-Z\s]+?)(?:\s*(?:FATHER|LAST|SURNAME|DOB|DATE|/|\n|$))",
+        r"INCOME\s*TAX\s*DEPARTMENT.*?\n(.*?)(?:\s*(?:FATHER|LAST|SURNAME|DOB|DATE|/|\n|$))",
+        r"GOVT.\s*OF\s*INDIA.*?\n(.*?)(?:\s*(?:FATHER|LAST|SURNAME|DOB|DATE|/|\n|$))"
     ]
     
+    # First try pattern matching
+    print("[PAN DEBUG] Trying pattern matching...")
     for line in lines:
-        # First try to find name in current line using patterns
-        for pattern in name_patterns:
-            name_match = re.search(pattern, line)
+        print(f"[PAN DEBUG] Checking line: {line}")
+        for i, pattern in enumerate(name_patterns):
+            print(f"[PAN DEBUG] Trying pattern {i+1}")
+            name_match = re.search(pattern, line, re.DOTALL)
             if name_match:
                 name = name_match.group(1).strip()
+                print(f"[PAN DEBUG] Found potential name with pattern {i+1}: {name}")
+                # Clean the name
+                name = re.sub(r'[^A-Z\s]', '', name)
+                name = ' '.join(word for word in name.split() if len(word) > 1)  # Remove single characters
                 if len(name.split()) >= 2:  # Ensure we have at least two parts in the name
+                    print(f"[PAN DEBUG] Valid name found: {name}")
                     return name
-        
-        # If no pattern matched but line is between "NAME" and "FATHER"
-        if "NAME" in line:
-            # Look at next line for name
-            next_idx = lines.index(line) + 1
-            if next_idx < len(lines):
-                next_line = lines[next_idx].strip()
-                # Check if next line looks like a name (no special chars, multiple words)
-                if re.match(r'^[A-Z\s]+$', next_line) and len(next_line.split()) >= 2:
-                    return next_line
+                else:
+                    print("[PAN DEBUG] Name too short, continuing search...")
     
+    # If no pattern matched, try positional logic
+    print("[PAN DEBUG] Pattern matching failed, trying positional logic...")
+    for i, line in enumerate(lines):
+        # Look for common PAN card headers
+        if any(header in line for header in ["INCOME TAX DEPARTMENT", "GOVT. OF INDIA", "PERMANENT ACCOUNT NUMBER"]):
+            print(f"[PAN DEBUG] Found header in line {i+1}: {line}")
+            # Check next few lines for potential name
+            for j in range(i+1, min(i+4, len(lines))):
+                potential_name = lines[j].strip()
+                print(f"[PAN DEBUG] Checking line {j+1} for name: {potential_name}")
+                # Skip lines with common PAN card text
+                if any(x in potential_name for x in ["PERMANENT", "ACCOUNT", "NUMBER", "FATHER", "DATE", "SIGNATURE", "PAN", "GOVT", "INCOME"]):
+                    print(f"[PAN DEBUG] Line {j+1} contains common text, skipping")
+                    continue
+                # Clean the potential name
+                potential_name = re.sub(r'[^A-Z\s]', '', potential_name)
+                potential_name = ' '.join(word for word in potential_name.split() if len(word) > 1)
+                if len(potential_name.split()) >= 2:
+                    print(f"[PAN DEBUG] Valid name found using positional logic: {potential_name}")
+                    return potential_name
+                else:
+                    print("[PAN DEBUG] Name too short, continuing search...")
+    
+    # If still no name found, try looking for text between PAN number and Father's name
+    print("[PAN DEBUG] Positional logic failed, trying PAN number to Father's name method...")
+    pan_pattern = r'\b[A-Z]{5}[0-9]{4}[A-Z]\b'
+    father_pattern = r'FATHER|FATHER\'S NAME|FATHER NAME'
+    
+    for i, line in enumerate(lines):
+        if re.search(pan_pattern, line):
+            print(f"[PAN DEBUG] Found PAN number in line {i+1}: {line}")
+            # Look at lines between PAN number and Father's name
+            for j in range(i+1, len(lines)):
+                if re.search(father_pattern, lines[j]):
+                    print(f"[PAN DEBUG] Found Father's name line at {j+1}")
+                    break
+                potential_name = lines[j].strip()
+                print(f"[PAN DEBUG] Checking line {j+1} for name: {potential_name}")
+                # Clean and validate the potential name
+                potential_name = re.sub(r'[^A-Z\s]', '', potential_name)
+                potential_name = ' '.join(word for word in potential_name.split() if len(word) > 1)
+                if len(potential_name.split()) >= 2:
+                    print(f"[PAN DEBUG] Valid name found between PAN and Father's name: {potential_name}")
+                    return potential_name
+                else:
+                    print("[PAN DEBUG] Name too short, continuing search...")
+    
+    print("[PAN DEBUG] All name extraction methods failed")
     return None
 
 def verify_document(doc_path, doc_type):

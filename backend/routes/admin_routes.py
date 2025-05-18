@@ -102,7 +102,7 @@ def get_all_users():
         "users": [
             {
                 "id": u.id,
-                "name": u.name,
+                "username": u.username,
                 "email": u.email,
                 "role": u.role
             } for u in users
@@ -168,15 +168,25 @@ def delete_document(doc_id):
 # ------------------- 3. AI Forgery Reports ------------------- #
 @admin_bp.route('/reports', methods=['GET'])
 def get_reports():
-    reports = Document.query.filter(Document.result_data != None).all()
+    reports = db.session.query(
+        Document,
+        User.email,
+        User.username,
+        User.role
+    ).join(User, Document.user_id == User.id).filter(Document.result_data != None).all()
+    
     log_action(user_id=1, action="Forgery Reports Access")
     return jsonify([
         {
-            "id": r.id,
-            "user_id": r.user_id,
-            "type": r.doc_type,
-            "status": r.status,
-            "result": r.result_data
+            "id": r[0].id,
+            "user_id": r[0].user_id,
+            "type": r[0].doc_type,
+            "status": r[0].status,
+            "result": r[0].result_data,
+            "email": r[1],
+            "username": r[2],
+            "role": r[3],
+            "file_url": f"/uploads/{os.path.basename(r[0].file_path)}"
         } for r in reports
     ])
 

@@ -2,32 +2,53 @@
 
 import React, { useState } from "react";
 import { useNavigate } from "react-router-dom";
+import axios from "axios";
 
 const Register = () => {
-  const [form, setForm] = useState({ name: "", email: "", password: "" });
+  const [form, setForm] = useState({
+    username: "",
+    email: "",
+    password: ""
+  });
+  const [error, setError] = useState("");
   const navigate = useNavigate();
 
   const handleChange = (e) =>
     setForm({ ...form, [e.target.name]: e.target.value });
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
-    // Simulate registration
-    navigate("/login");
+    try {
+      const response = await axios.post(
+        "http://localhost:5000/api/auth/register",
+        form,
+        { withCredentials: true }
+      );
+      if (response.data.message === "User registered successfully") {
+        navigate("/login");
+      }
+    } catch (error) {
+      setError(error.response?.data?.error || "Registration failed");
+    }
   };
 
   return (
-    <div className="container mt-5 col-md-6">
-      <h2>Register</h2>
+    <div className="container mt-5" style={{ maxWidth: "500px" }}>
+      <h2 className="text-center mb-4">Register</h2>
+      {error && (
+        <div className="alert alert-danger" role="alert">
+          {error}
+        </div>
+      )}
       <form onSubmit={handleSubmit}>
         <div className="mb-3">
-          <label>Full Name</label>
+          <label>Username</label>
           <input
             type="text"
             className="form-control"
-            name="name"
-            placeholder="Enter full name"
-            value={form.name}
+            name="username"
+            placeholder="Enter username"
+            value={form.username}
             onChange={handleChange}
             required
           />

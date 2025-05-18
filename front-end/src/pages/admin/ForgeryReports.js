@@ -10,10 +10,12 @@ const ForgeryReports = () => {
 
   const fetchReports = async () => {
     try {
-      const res = await axios.get("http://localhost:5000/api/admin/reports");
-      setReports(res.data);
-    } catch (err) {
-      console.error("Failed to fetch reports", err);
+      const response = await axios.get("http://localhost:5000/api/admin/reports", {
+        withCredentials: true,
+      });
+      setReports(response.data);
+    } catch (error) {
+      console.error("Error fetching reports:", error);
     }
   };
 
@@ -76,7 +78,9 @@ const ForgeryReports = () => {
         <thead className="table-primary">
           <tr>
             <th>Sr. No.</th>
+            <th>Username</th>
             <th>Email</th>
+            <th>Role</th>
             <th>Document Type</th>
             <th>Status</th>
             <th>Uploaded Document</th>
@@ -86,7 +90,7 @@ const ForgeryReports = () => {
         <tbody>
           {reports.length === 0 ? (
             <tr>
-              <td colSpan="6" className="text-center py-4">
+              <td colSpan="8" className="text-center py-4">
                 No Forgery Detection Reports found.
               </td>
             </tr>
@@ -94,12 +98,14 @@ const ForgeryReports = () => {
             reports.map((report, index) => (
               <tr key={report.id}>
                 <td>{index + 1}</td>
+                <td>{report.username}</td>
                 <td>{report.email}</td>
+                <td>{report.role}</td>
                 <td>{report.type}</td>
                 <td>{report.status}</td>
                 <td>
                   <a
-                    href={report.document_url}
+                    href={`http://localhost:5000${report.file_url}`}
                     target="_blank"
                     rel="noopener noreferrer"
                     className="btn btn-sm btn-outline-primary"

@@ -13,7 +13,7 @@ const Navbar = ({ isAuthenticated, isAdmin, onLogout }) => {
 
   return (
     <nav className="navbar navbar-expand-lg navbar-dark bg-primary px-4">
-      <Link className="navbar-brand" to="/">DocVerify</Link>
+      <Link className="navbar-brand" to="/">AutoVerify</Link>
       <button
         className="navbar-toggler"
         type="button"
