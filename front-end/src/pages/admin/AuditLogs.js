@@ -61,7 +61,6 @@ const AuditLogs = () => {
               }}
             >
               <Link to="/admin/manage-users" className="dropdown-item">Manage Users</Link>
-              <Link to="/admin/view-documents" className="dropdown-item">View Documents</Link>
               <Link to="/admin/forgery-reports" className="dropdown-item">Forgery Reports</Link>
               <Link to="/admin/audit-logs" className="dropdown-item">Audit Logs</Link>
             </div>

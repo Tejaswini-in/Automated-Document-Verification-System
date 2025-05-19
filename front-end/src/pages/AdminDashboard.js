@@ -27,18 +27,6 @@ const AdminDashboard = () => {
           style={{ backgroundColor: '#e3f2fd', borderRadius: '8px' }}
         >
           <Link
-            to="/admin/view-documents"
-            style={{ textDecoration: 'none', color: 'inherit' }}
-          >
-            📄 <b>View Documents</b>
-          </Link>
-        </li>
-
-        <li
-          className="list-group-item mb-3"
-          style={{ backgroundColor: '#e3f2fd', borderRadius: '8px' }}
-        >
-          <Link
             to="/admin/forgery-reports"
             style={{ textDecoration: 'none', color: 'inherit' }}
           >

@@ -12,8 +12,10 @@ from database import db
 from services.ocr_service import extract_text_from_image
 
 def clean_text(text):
-    """Remove non-alphanumeric characters and normalize whitespace."""
-    return re.sub(r'[^a-zA-Z0-9\s]', '', text).lower()
+    """Remove non-alphabetic characters, normalize whitespace, and convert to lower case."""
+    text = re.sub(r'[^a-zA-Z\s]', '', text).lower()
+    text = re.sub(r'\s+', ' ', text).strip()
+    return text
 
 def fuzzy_match(text, keyword, threshold=0.7):
     """
@@ -40,34 +42,19 @@ def preprocess_image(path):
     return Image.fromarray(thresh)
 
 def extract_aadhaar_name(text):
-    """Extract name from Aadhaar card text format."""
-    # Split text into lines and clean them
     lines = [line.strip() for line in text.upper().split('\n') if line.strip()]
-    
     for i, line in enumerate(lines):
-        # Look for lines that come right before DOB
-        if i + 1 < len(lines) and "DOB:" in lines[i + 1]:
-            # This line is likely the English name
-            # Remove any common prefixes/suffixes
-            name = line.strip()
-            # Clean up any extra spaces
-            name = ' '.join(word for word in name.split() if not any(x in word for x in ["DOB:", "/DOB", "MALE", "FEMALE"]))
-            if len(name.split()) >= 2:  # Ensure we have at least two parts in the name
-                return name
-            
-        # Alternative method: Look for lines with multiple words between Government of India and DOB
-        if "GOVERNMENT OF INDIA" in line or "UNIQUE IDENTIFICATION" in line:
-            # Check next few lines for name
-            for j in range(i+1, min(i+4, len(lines))):
-                if "DOB:" in lines[j]:
-                    break
-                potential_name = lines[j].strip()
-                # Skip lines with common Aadhaar card text
-                if any(x in potential_name for x in ["GOVERNMENT", "UNIQUE", "ADDRESS:", "AADHAAR", "MALE", "FEMALE", "DOB:"]):
-                    continue
-                if len(potential_name.split()) >= 2:
-                    return potential_name
-    
+        # Look for line with "DOB" and take the previous line as name
+        if "DOB" in line and i > 0:
+            possible_name = lines[i-1].strip()
+            # Filter out lines that are not likely names
+            if all(x not in possible_name for x in ["GOVERNMENT", "UNIQUE", "INDIA", "DOB", "FEMALE", "MALE", "YEAR", "BIRTH", "ADDRESS", "ENROLMENT", "AADHAAR", "AUTHORITY"]):
+                if len(possible_name.split()) >= 2:
+                    return possible_name.title()
+    # Fallback: look for the first line with at least two words and not a keyword
+    for line in lines:
+        if len(line.split()) >= 2 and all(x not in line for x in ["GOVERNMENT", "UNIQUE", "INDIA", "DOB", "FEMALE", "MALE", "YEAR", "BIRTH", "ADDRESS", "ENROLMENT", "AADHAAR", "AUTHORITY"]):
+            return line.title()
     return None
 
 def clean_voter_id(text):
@@ -86,70 +73,87 @@ def test_voter_id_pattern(voter_id):
     return False, None
 
 def extract_voter_id_details(text):
-    """Extract voter ID number and name from the text."""
-    details = {
-        'voter_id': None,
-        'name': None
-    }
-    
-    # Split text into lines and clean them
+    print("Full OCR output for Voter ID:", text)
+    details = {'voter_id': None, 'name': None}
     lines = [line.strip() for line in text.upper().split('\n') if line.strip()]
-    
-    # Look for voter ID number (e.g., GDNO225185 format)
-    # Pattern: 3 letters + 1 letter/number + 6 numbers
-    voter_id_pattern = re.compile(r'\b[A-Z]{3}[A-Z0-9]\d{6}\b')
-    
-    # Look for name after "ELECTOR'S NAME :" or similar patterns
-    name_patterns = [
-        r"ELECTOR'S NAME\s*[:.-]\s*(.*?)(?:\s*\n|$)",
-        r"ELECTOR'S NAME\s*[:-]\s*(.*?)(?:\s*\n|$)",
-        r"ELECTOR NAME\s*[:.-]\s*(.*?)(?:\s*\n|$)",
-        r"ELECTOR.*NAME.*[:.-]\s*(.*?)(?:\s*\n|$)"  # More flexible pattern
-    ]
-    
-    # Search in each line
-    for line in lines:
-        # Search for voter ID
-        if not details['voter_id']:
-            voter_match = voter_id_pattern.search(line)
-            if voter_match:
-                # Clean the voter ID by removing spaces and special characters
-                voter_id = clean_voter_id(voter_match.group(0))
-                if len(voter_id) == 10:  # Must be exactly 10 characters
-                    details['voter_id'] = voter_id
-                    print(f"Found voter ID match: {voter_id}")
-                    print(f"  First 3 letters: {voter_id[:3]}")
-                    print(f"  Fourth character (letter/number): {voter_id[3]}")
-                    print(f"  Last 6 digits: {voter_id[4:]}")
-        
-        # Search for name
-        if not details['name']:
-            for pattern in name_patterns:
-                name_match = re.search(pattern, line, re.IGNORECASE)
-                if name_match:
-                    # Clean the name by removing special characters but keep spaces
-                    name = re.sub(r'[^A-Z\s]', '', name_match.group(1).upper()).strip()
-                    if len(name.split()) >= 2:  # Ensure we have at least two parts in the name
-                        details['name'] = name
-                        break
-    
-    # Debug output
+    joined = ''.join(lines)
+    cleaned = re.sub(r'[^A-Z0-9]', '', joined)
+    skip_words = {"ELECTIONCO", "COMMISSIONO", "INDIAELECT", "PHOTOIDENT", "CARD"}
+
+    # Fuzzy match any 9-11 character substring to a database ID
+    db_ids = [r.id_number for r in Data.query.filter_by(document_type='voter_id').all()]
+    best_match = None
+    best_score = 0
+    for i in range(len(cleaned) - 8):
+        for length in [9, 10, 11]:
+            candidate = cleaned[i:i+length]
+            if candidate.isalnum() and candidate not in skip_words:
+                for db_id in db_ids:
+                    score = SequenceMatcher(None, candidate, db_id).ratio()
+                    if score > best_score:
+                        best_score = score
+                        best_match = db_id
+    if best_score > 0.8:
+        details['voter_id'] = best_match
+        print(f"Fuzzy matched voter ID: {best_match} (score: {best_score})")
+    # Name extraction (same as before)
+    for i, line in enumerate(lines):
+        if "ELECTOR'S NAME" in line or "NAME" in line:
+            if ':' in line:
+                possible_name = line.split(':', 1)[1].strip()
+                possible_name_clean = re.sub(r'[^A-Z\s]', '', possible_name)
+                if len(possible_name_clean.split()) >= 2 and all(w.isalpha() for w in possible_name_clean.split()):
+                    details['name'] = possible_name_clean
+                    break
+            if i+1 < len(lines):
+                next_line = lines[i+1].strip()
+                next_line_clean = re.sub(r'[^A-Z\s]', '', next_line)
+                if len(next_line_clean.split()) >= 2 and all(w.isalpha() for w in next_line_clean.split()):
+                    details['name'] = next_line_clean
+                    break
     print(f"Extracted Voter ID: {details['voter_id']}")
     print(f"Extracted Name: {details['name']}")
-    
     return details
 
 def extract_pan_name(text):
-    """Extract name from PAN card text format."""
     print("[PAN DEBUG] Starting name extraction")
     print("[PAN DEBUG] Input text:")
     print(text)
-    
-    # Split text into lines and clean them
     lines = [line.strip() for line in text.upper().split('\n') if line.strip()]
     print(f"[PAN DEBUG] Found {len(lines)} non-empty lines")
-    
-    # Common patterns found in PAN cards
+
+    skip_keywords = [
+        "PERMANENT", "ACCOUNT", "NUMBER", "FATHER", "DATE", "SIGNATURE", "PAN", "GOVT", "INCOME",
+        "STREE", "TANT", "EQUAL", "PHOTO", "GENDER", "MALE", "FEMALE", "YEAR", "BIRTH"
+    ]
+
+    # 1. Look for 'NAME' label and take the next non-empty line, but stop if 'FATHER' label is encountered
+    for i, line in enumerate(lines):
+        if "NAME" in line and "FATHER" not in line and i + 1 < len(lines):
+            # Find the next non-empty line that is not a label
+            for j in range(i + 1, len(lines)):
+                possible_name = lines[j].strip()
+                if "FATHER" in possible_name or "SURNAME" in possible_name or "DOB" in possible_name:
+                    break  # Stop if we hit the father's name label or other labels
+                if all(x not in possible_name for x in skip_keywords) and len(possible_name.split()) >= 2:
+                    print(f"[PAN DEBUG] Found name under 'NAME' label: {possible_name}")
+                    return possible_name.title()
+            break  # Only process the first 'NAME' label
+
+    # 2. Try to find the first line after "INCOME TAX DEPARTMENT" or "GOVT. OF INDIA" that looks like a name (old format)
+    for i, line in enumerate(lines):
+        if "INCOME TAX DEPARTMENT" in line or "GOVT. OF INDIA" in line:
+            for j in range(i+1, min(i+4, len(lines))):
+                possible_name = lines[j].strip()
+                print(f"[PAN DEBUG] Candidate after header: {possible_name}")
+                if any(x in possible_name for x in skip_keywords):
+                    continue
+                words = possible_name.split()
+                if len(words) >= 2 and sum(w.isalpha() for w in words) >= len(words) - 1:
+                    print(f"[PAN DEBUG] Found name after header: {possible_name}")
+                    return possible_name.title()
+
+    # 3. Fallback: pattern matching logic
     name_patterns = [
         r"NAME\s*[:.-]*\s*([A-Z\s]+?)(?:\s*(?:FATHER|LAST|SURNAME|DOB|DATE|/|\n|$))",
         r"\bNAME\b[:\s.-]*([A-Z\s]+?)(?:\s*(?:FATHER|LAST|SURNAME|DOB|DATE|/|\n|$))",
@@ -157,73 +161,26 @@ def extract_pan_name(text):
         r"INCOME\s*TAX\s*DEPARTMENT.*?\n(.*?)(?:\s*(?:FATHER|LAST|SURNAME|DOB|DATE|/|\n|$))",
         r"GOVT.\s*OF\s*INDIA.*?\n(.*?)(?:\s*(?:FATHER|LAST|SURNAME|DOB|DATE|/|\n|$))"
     ]
-    
-    # First try pattern matching
-    print("[PAN DEBUG] Trying pattern matching...")
     for line in lines:
-        print(f"[PAN DEBUG] Checking line: {line}")
-        for i, pattern in enumerate(name_patterns):
-            print(f"[PAN DEBUG] Trying pattern {i+1}")
+        for pattern in name_patterns:
             name_match = re.search(pattern, line, re.DOTALL)
             if name_match:
                 name = name_match.group(1).strip()
-                print(f"[PAN DEBUG] Found potential name with pattern {i+1}: {name}")
-                # Clean the name
                 name = re.sub(r'[^A-Z\s]', '', name)
-                name = ' '.join(word for word in name.split() if len(word) > 1)  # Remove single characters
-                if len(name.split()) >= 2:  # Ensure we have at least two parts in the name
+                name = ' '.join(word for word in name.split() if len(word) > 1)
+                if len(name.split()) >= 2:
                     print(f"[PAN DEBUG] Valid name found: {name}")
-                    return name
-                else:
-                    print("[PAN DEBUG] Name too short, continuing search...")
-    
-    # If no pattern matched, try positional logic
-    print("[PAN DEBUG] Pattern matching failed, trying positional logic...")
-    for i, line in enumerate(lines):
-        # Look for common PAN card headers
-        if any(header in line for header in ["INCOME TAX DEPARTMENT", "GOVT. OF INDIA", "PERMANENT ACCOUNT NUMBER"]):
-            print(f"[PAN DEBUG] Found header in line {i+1}: {line}")
-            # Check next few lines for potential name
-            for j in range(i+1, min(i+4, len(lines))):
-                potential_name = lines[j].strip()
-                print(f"[PAN DEBUG] Checking line {j+1} for name: {potential_name}")
-                # Skip lines with common PAN card text
-                if any(x in potential_name for x in ["PERMANENT", "ACCOUNT", "NUMBER", "FATHER", "DATE", "SIGNATURE", "PAN", "GOVT", "INCOME"]):
-                    print(f"[PAN DEBUG] Line {j+1} contains common text, skipping")
-                    continue
-                # Clean the potential name
-                potential_name = re.sub(r'[^A-Z\s]', '', potential_name)
-                potential_name = ' '.join(word for word in potential_name.split() if len(word) > 1)
-                if len(potential_name.split()) >= 2:
-                    print(f"[PAN DEBUG] Valid name found using positional logic: {potential_name}")
-                    return potential_name
-                else:
-                    print("[PAN DEBUG] Name too short, continuing search...")
-    
-    # If still no name found, try looking for text between PAN number and Father's name
-    print("[PAN DEBUG] Positional logic failed, trying PAN number to Father's name method...")
+                    return name.title()
+
+    # 4. Fallback: first line with at least two words after PAN number
     pan_pattern = r'\b[A-Z]{5}[0-9]{4}[A-Z]\b'
-    father_pattern = r'FATHER|FATHER\'S NAME|FATHER NAME'
-    
     for i, line in enumerate(lines):
         if re.search(pan_pattern, line):
-            print(f"[PAN DEBUG] Found PAN number in line {i+1}: {line}")
-            # Look at lines between PAN number and Father's name
-            for j in range(i+1, len(lines)):
-                if re.search(father_pattern, lines[j]):
-                    print(f"[PAN DEBUG] Found Father's name line at {j+1}")
-                    break
-                potential_name = lines[j].strip()
-                print(f"[PAN DEBUG] Checking line {j+1} for name: {potential_name}")
-                # Clean and validate the potential name
-                potential_name = re.sub(r'[^A-Z\s]', '', potential_name)
-                potential_name = ' '.join(word for word in potential_name.split() if len(word) > 1)
-                if len(potential_name.split()) >= 2:
-                    print(f"[PAN DEBUG] Valid name found between PAN and Father's name: {potential_name}")
-                    return potential_name
-                else:
-                    print("[PAN DEBUG] Name too short, continuing search...")
-    
+            for j in range(i+1, min(i+4, len(lines))):
+                possible_name = lines[j].strip()
+                if len(possible_name.split()) >= 2 and all(x not in possible_name for x in skip_keywords):
+                    print(f"[PAN DEBUG] Fallback name after PAN number: {possible_name}")
+                    return possible_name.title()
     print("[PAN DEBUG] All name extraction methods failed")
     return None
 
@@ -266,6 +223,12 @@ def verify_document(doc_path, doc_type):
                                         clean_text(name), 
                                         clean_text(record.name)).ratio()
             
+            print(f"Extracted Name (raw): '{name}'")
+            print(f"Database Name (raw): '{record.name}'")
+            print(f"Extracted Name (clean): '{clean_text(name)}'")
+            print(f"Database Name (clean): '{clean_text(record.name)}'")
+            print(f"Name similarity: {name_similarity}")
+            
             if name_similarity >= 0.8:  # 80% similarity threshold
                 status = "Verified"
                 return status, f"Document verified successfully. Matched record for {name}"
@@ -307,6 +270,12 @@ def verify_document(doc_path, doc_type):
             name_similarity = SequenceMatcher(None, doc_name, db_name).ratio()
             print(f"Name similarity: {name_similarity}")
             
+            print(f"Extracted Name (raw): '{name}'")
+            print(f"Database Name (raw): '{record.name}'")
+            print(f"Extracted Name (clean): '{clean_text(name)}'")
+            print(f"Database Name (clean): '{clean_text(record.name)}'")
+            print(f"Name similarity: {name_similarity}")
+            
             if name_similarity >= 0.8:  # 80% similarity threshold
                 return "Verified", f"PAN Card verified successfully. Matched record for {name}"
             else:
@@ -337,40 +306,31 @@ def verify_document(doc_path, doc_type):
         elif doc_type == 'voter_id':
             # Extract voter ID details
             details = extract_voter_id_details(extracted_text)
-            
             if not details['voter_id']:
                 print("Failed to extract voter ID. Full text:", extracted_text)
                 return "Rejected", "Could not find valid Voter ID number in document"
-                
             voter_number = details['voter_id']
             print(f"Found Voter ID Number: {voter_number}")
-            
             # Check if this ID exists in database
             record = Data.query.filter_by(id_number=voter_number).first()
             if not record:
                 return "Rejected", "No matching Voter ID record found in database"
-                
             # Verify document type
             if record.document_type != 'voter_id':
                 return "Rejected", "Document type mismatch"
-            
-            # If name was extracted, verify it
-            if details['name']:
-                print(f"Extracted Name: {details['name']}")
-                # Clean both names for comparison
-                doc_name = clean_text(details['name'])
-                db_name = clean_text(record.name)
-                print(f"Comparing names: '{doc_name}' with '{db_name}'")
-                
-                name_similarity = SequenceMatcher(None, doc_name, db_name).ratio()
-                print(f"Name similarity: {name_similarity}")
-                
-                if name_similarity >= 0.8:  # 80% similarity threshold
-                    return "Verified", f"Voter ID verified successfully. Matched record for {details['name']}"
-                else:
-                    return "Rejected", "Name in document does not match records"
-            
-            return "Verified", "Voter ID verified successfully"
+            # Require name extraction and matching
+            if not details['name']:
+                return "Rejected", "Could not extract name from document"
+            print(f"Extracted Name: {details['name']}")
+            doc_name = clean_text(details['name'])
+            db_name = clean_text(record.name)
+            print(f"Comparing names: '{doc_name}' with '{db_name}'")
+            name_similarity = SequenceMatcher(None, doc_name, db_name).ratio()
+            print(f"Name similarity: {name_similarity}")
+            if name_similarity >= 0.8:
+                return "Verified", f"Voter ID verified successfully. Matched record for {details['name']}"
+            else:
+                return "Rejected", "Name in document does not match records"
 
         # Passport
         elif doc_type == 'passport':
@@ -382,19 +342,15 @@ def verify_document(doc_path, doc_type):
                 if not mrz_match:
                     return "Rejected", "Could not find valid Passport number in document"
                 return "Verified", "Passport format verified (MRZ found)"
-                
             passport_number = passport_match.group(0)
             print(f"Found Passport Number: {passport_number}")
-            
             # Check if this ID exists in database
             record = Data.query.filter_by(id_number=passport_number).first()
             if not record:
                 return "Rejected", "No matching Passport record found in database"
-                
-            # Verify document type
-            if record.document_type != 'passport':
+            # Verify document type (case-insensitive)
+            if record.document_type.strip().lower() != 'passport':
                 return "Rejected", "Document type mismatch"
-                
             return "Verified", "Passport verified successfully"
 
         return status, "Invalid document type"
@@ -402,3 +358,5 @@ def verify_document(doc_path, doc_type):
     except Exception as e:
         print(f"[ERROR] Document verification failed: {str(e)}")
         return "Rejected", str(e)
+
+print(SequenceMatcher(None, "meena devi", "meena davi").ratio())
